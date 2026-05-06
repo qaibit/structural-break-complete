@@ -1,7 +1,10 @@
 pandas
 numpy
 scikit-learn
+scipy
 catboost
 xgboost
-scipy
 torch
+tqdm
+statsmodels
+imbalanced-learn
