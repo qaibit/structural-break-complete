@@ -31,8 +31,7 @@ Mejoras propuestas para PINT-Seq v3.0:
    - Añadir más estrato en stride
 """
 
-import sys
-sys.path.append('/Users/dario/Documents/Pruebas/product')
+import os, sys
 
 # Importar módulo base
 from pint_7326 import (
@@ -53,28 +52,29 @@ from sklearn.metrics import roc_auc_score
 DEVICE = "cuda" if torch.cuda.is_available() else ("mps" if (hasattr(torch.backends,"mps") and torch.backends.mps.is_available()) else "cpu")
 if DEVICE=="mps": DEVICE="cpu"  # estabilidad
 
-# ===== CONFIG V3.0 MEJORADA =====
-SEQ_WINDOWS_V3 = [160, 256]  # Solo ventanas más grandes (mejor rendimiento)
-EPOCHS_SEQ_V3 = 18                   # Mismas épocas que v2.1
-BATCH_SEQ_V3 = 128                   # Batch más grande
-LR_SEQ_V3 = 2.0e-3                   # LR más alto
-STRIDE_SEQ_V3 = 8                    # Mantener
-W_PRE_V3 = 160                       # Mantener
-W_POST_V3 = 160                      # Mantener
-MAX_SEQ_V3 = 512                     # Mantener
-DT_V3 = 1.0                          # Mantener
+# ===== CONFIG V3.0 =====
+# NOTE: These are starter hyperparameters. Tune for your dataset.
+SEQ_WINDOWS_V3 = [160]                    # Tune: window sizes
+EPOCHS_SEQ_V3 = 12                        # Tune: training epochs
+BATCH_SEQ_V3 = 64                         # Tune: batch size
+LR_SEQ_V3 = 1.5e-3                        # Tune: learning rate
+STRIDE_SEQ_V3 = 8
+W_PRE_V3 = 128                            # Tune: pre-break window
+W_POST_V3 = 128                           # Tune: post-break window
+MAX_SEQ_V3 = 512
+DT_V3 = 1.0
 
 # ===== PINTSeq v3.0 con más capacidad =====
 class PINTSeq_v3(nn.Module):
-    def __init__(self, din, proj=96, lstm_h=128, layers=2, dropout=0.35):
+    def __init__(self, din, proj=64, lstm_h=96, layers=1, dropout=0.30):  # Tune: architecture dims
         super().__init__()
         self.proj = nn.Sequential(nn.Linear(din, proj), nn.LayerNorm(proj), nn.ReLU(), nn.Dropout(dropout))
         self.lstm = nn.LSTM(proj, lstm_h, num_layers=layers, batch_first=True, bidirectional=True, dropout=dropout if layers > 1 else 0)
         H2=2*lstm_h
-        self.pool=SelfAttnPool(H2,hidden=96)  # +32 hidden
-        self.head_break = nn.Sequential(nn.Linear(H2*2, 192), nn.ReLU(), nn.Dropout(dropout), nn.Linear(192, 1))
+        self.pool=SelfAttnPool(H2,hidden=64)  # Tune: attention hidden
+        self.head_break = nn.Sequential(nn.Linear(H2*2, 128), nn.ReLU(), nn.Dropout(dropout), nn.Linear(128, 1))  # Tune: head dims
         self.head_map = nn.Linear(H2,1)
-        self.head_vr  = nn.Sequential(nn.Linear(H2,96), nn.ReLU(), nn.Linear(96,1))
+        self.head_vr  = nn.Sequential(nn.Linear(H2,64), nn.ReLU(), nn.Linear(64,1))
         self.head_cv  = nn.Sequential(nn.Linear(H2,48), nn.ReLU(), nn.Linear(48,1))
     def forward(self, X, mask, br_idx):
         Z=self.proj(X); H,_=self.lstm(Z)
@@ -125,8 +125,8 @@ def train_one_fold_seq_v3(pack_tr, y_ser, idx_tr, epochs=EPOCHS_SEQ_V3, bs=BATCH
     din=pack_tr['D_in']
     # Inicializar parámetros con seed reproducible
     torch.manual_seed(seed)
-    model=PINTSeq_v3(din, proj=96, lstm_h=128, layers=2, dropout=0.35).to(DEVICE)
-    opt=optim.AdamW(model.parameters(), lr=lr, betas=(0.9,0.99), weight_decay=5e-4)  # Más weight decay
+    model=PINTSeq_v3(din, proj=64, lstm_h=96, layers=1, dropout=0.30).to(DEVICE)  # Tune: architecture
+    opt=optim.AdamW(model.parameters(), lr=lr, betas=(0.9,0.99), weight_decay=3e-4)
     # Warmup scheduler
     warmup_epochs = max(1, epochs // 5)
     def lr_lambda(ep):
@@ -134,7 +134,7 @@ def train_one_fold_seq_v3(pack_tr, y_ser, idx_tr, epochs=EPOCHS_SEQ_V3, bs=BATCH
             return float(ep / warmup_epochs)
         return 1.0
     sch=optim.lr_scheduler.LambdaLR(opt, lr_lambda)
-    L_BREAK,L_MAP,L_VR,L_CV,L_REG = 1.5, 0.05, 0.10, 0.08, 1e0  # Más peso en break
+    L_BREAK,L_MAP,L_VR,L_CV,L_REG = 1.0, 0.05, 0.10, 0.08, 1e0  # Tune: loss weights
 
     it=_pbar(range(epochs),desc="Entrenando (v3.0)",leave=True) if verbose else range(epochs)
     ema=None

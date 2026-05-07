@@ -5,7 +5,6 @@ Desde notebook: importar este archivo y ejecutar run_all_combined
 """
 
 import sys
-sys.path.append('/Users/dario/Documents/Pruebas/data')
 
 # Importar ambos módulos
 from expertos_8642 import (
@@ -211,10 +210,10 @@ def run_all_combined(
             print("   📈 PINT-Hybrid...")
             cbP_params = dict(
                 loss_function="Logloss", eval_metric="AUC", auto_class_weights="Balanced",
-                iterations=3200, learning_rate=0.024, depth=7, l2_leaf_reg=10.0,
-                verbose=False, thread_count=1, rsm=0.90, border_count=128,
-                bootstrap_type="Bayesian", bagging_temperature=0.7,
-                random_strength=0.6, leaf_estimation_iterations=6
+                iterations=2000, learning_rate=0.03, depth=6, l2_leaf_reg=5.0,  # Tune: these values
+                verbose=False, thread_count=1, rsm=0.85, border_count=128,
+                bootstrap_type="Bayesian", bagging_temperature=1.0,
+                random_strength=0.5, leaf_estimation_iterations=4
             )
             oof_ph, te_ph, auc_ph = oof_pint_hybrid_with_test(
                 Xmi, y_vec, Xmi_t,
