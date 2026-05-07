@@ -208,13 +208,9 @@ def run_all_combined(
     if use_pint_hybrid and HAS_TORCH:
         try:
             print("   📈 PINT-Hybrid...")
-            cbP_params = dict(
-                loss_function="Logloss", eval_metric="AUC", auto_class_weights="Balanced",
-                iterations=2000, learning_rate=0.03, depth=6, l2_leaf_reg=5.0,  # Tune: these values
-                verbose=False, thread_count=1, rsm=0.85, border_count=128,
-                bootstrap_type="Bayesian", bagging_temperature=1.0,
-                random_strength=0.5, leaf_estimation_iterations=4
-            )
+            # Supply your own fine-tuned CatBoost params for PINT-Hybrid
+            cbP_params = None  # Supply your own fine-tuned parameters (dict)
+            assert cbP_params is not None, "Supply your own fine-tuned CatBoost params"
             oof_ph, te_ph, auc_ph = oof_pint_hybrid_with_test(
                 Xmi, y_vec, Xmi_t,
                 series_source_tr=X_train, series_source_te=X_test,

@@ -23,29 +23,29 @@ except:
 def _pbar(it, **kw): return tqdm(it, **kw) if USE_TQDM else it
 
 # ----------------- Config -----------------
-# NOTE: These are starter/default hyperparameters provided for reference.
-# The production CONDOR system uses proprietary tuned values.
-# Tune these for your specific dataset. See: https://condor.qaibit.com
+# ⚠️  IMPORTANT: All proprietary hyperparameters have been removed.
+#     Supply your own fine-tuned parameters before running.
+#     The full optimized CONDOR engine is available at: https://condor.qaibit.com
+#     For licensing inquiries: condor@qaibit.com
+#
+#     © 2026 Qaibit Technologies S.L. — All rights reserved.
+
 FOLDS        = 5
 DT           = 1.0
-# CatBoost
-WINDOWS_CB   = [96, 128, 256]        # Tune: window sizes for feature extraction
-MODES_CB     = ["base", "pre2"]      # Tune: feature extraction modes
-CAT_PARAMS   = dict(
-    loss_function="Logloss", eval_metric="AUC",
-    random_seed=SEED, depth=5, learning_rate=0.05,  # Tune
-    l2_leaf_reg=5.0, iterations=800,                # Tune
-    border_count=128, subsample=0.85, colsample_bylevel=0.75,
-    verbose=False
-)
-# PINT-Seq (set RUN_SEQ=False to skip neural components)
+
+# CatBoost — supply your own fine-tuned parameters
+WINDOWS_CB   = None  # Supply your own window sizes (list of ints)
+MODES_CB     = None  # Supply your own feature extraction modes (list of strings)
+CAT_PARAMS   = None  # Supply your own fine-tuned CatBoost params (dict)
+
+# PINT-Seq — supply your own fine-tuned parameters
 RUN_SEQ      = True
-SEQ_WINDOWS  = [160]                # Tune: add more windows (e.g. [128, 160, 256])
-EPOCHS_SEQ   = 12                   # Tune: more epochs for better convergence
-BATCH_SEQ    = 64
-LR_SEQ       = 1.5e-3               # Tune: learning rate
-STRIDE_SEQ   = 8
-W_PRE=W_POST = 128                  # Tune: pre/post normalization window
+SEQ_WINDOWS  = None  # Supply your own sequence window sizes (list of ints)
+EPOCHS_SEQ   = None  # Supply your own training epochs (int)
+BATCH_SEQ    = None  # Supply your own batch size (int)
+LR_SEQ       = None  # Supply your own learning rate (float)
+STRIDE_SEQ   = None  # Supply your own stride (int)
+W_PRE=W_POST = None  # Supply your own pre/post normalization window (int)
 MAX_SEQ      = 512
 
 # ============================================================
@@ -471,13 +471,16 @@ class SelfAttnPool(nn.Module):
         c=torch.bmm(w.unsqueeze(1),H).squeeze(1); return c,w
 
 class PINTSeq(nn.Module):
-    def __init__(self, din, proj=48, lstm_h=64, layers=1, dropout=0.30):  # Tune: architecture dims
+    # Supply your own fine-tuned architecture dimensions
+    def __init__(self, din, proj=None, lstm_h=None, layers=None, dropout=None):
+        assert all(v is not None for v in [proj, lstm_h, layers, dropout]), \
+            "Supply your own fine-tuned architecture parameters (proj, lstm_h, layers, dropout)"
         super().__init__()
         self.proj = nn.Sequential(nn.Linear(din, proj), nn.LayerNorm(proj), nn.ReLU(), nn.Dropout(dropout))
         self.lstm = nn.LSTM(proj, lstm_h, num_layers=layers, batch_first=True, bidirectional=True, dropout=0.0)
         H2=2*lstm_h
-        self.pool=SelfAttnPool(H2,hidden=48)  # Tune: attention hidden
-        self.head_break = nn.Sequential(nn.Linear(H2*2, 96), nn.ReLU(), nn.Dropout(dropout), nn.Linear(96, 1))  # Tune: head dims
+        self.pool=SelfAttnPool(H2,hidden=None)  # Supply your own fine-tuned attention hidden dim
+        self.head_break = nn.Sequential(nn.Linear(H2*2, None), nn.ReLU(), nn.Dropout(dropout), nn.Linear(None, 1))  # Supply your own fine-tuned head dims
         self.head_map = nn.Linear(H2,1)
         self.head_vr  = nn.Sequential(nn.Linear(H2,64), nn.ReLU(), nn.Linear(64,1))
         self.head_cv  = nn.Sequential(nn.Linear(H2,32), nn.ReLU(), nn.Linear(32,1))
@@ -530,10 +533,12 @@ def train_one_fold_seq(pack_tr, y_ser, idx_tr, epochs=EPOCHS_SEQ, bs=BATCH_SEQ, 
     CV_list = [np.clip(c,0.0,3.0).astype(np.float32) for c in CV_list]
 
     din=pack_tr['D_in']
-    model=PINTSeq(din, proj=48, lstm_h=64, layers=1, dropout=0.30).to(DEVICE)  # Tune: architecture
-    opt=optim.AdamW(model.parameters(), lr=lr, betas=(0.9,0.99), weight_decay=3e-4)
+    # Supply your own fine-tuned architecture and training parameters
+    model=PINTSeq(din, proj=None, lstm_h=None, layers=None, dropout=None).to(DEVICE)
+    opt=optim.AdamW(model.parameters(), lr=lr, betas=(0.9,0.99), weight_decay=None)  # Supply your own weight_decay
     sch=optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1,epochs))
-    L_BREAK,L_MAP,L_VR,L_CV,L_REG = 1.0, 0.05, 0.10, 0.08, 1e0  # Tune: loss weights
+    # Supply your own fine-tuned loss weights
+    L_BREAK,L_MAP,L_VR,L_CV,L_REG = None, None, None, None, None
 
     it=_pbar(range(epochs),desc="Entrenando (épocas)",leave=True) if verbose else range(epochs)
     ema=None
